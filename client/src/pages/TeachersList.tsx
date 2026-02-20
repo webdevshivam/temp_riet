@@ -390,7 +390,7 @@ export default function TeachersList() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {teachers?.reduce((acc, t) => acc + t.assignedClasses.length, 0) || 0}
+              {teachers?.reduce((acc, t) => acc + (t.assignedClasses?.length || 0), 0) || 0}
             </div>
           </CardContent>
         </Card>
@@ -403,7 +403,7 @@ export default function TeachersList() {
           <CardContent>
             <div className="text-2xl font-bold">
               {teachers && teachers.length > 0
-                ? (teachers.reduce((acc, t) => acc + t.assignedClasses.length, 0) / teachers.length).toFixed(1)
+                ? (teachers.reduce((acc, t) => acc + (t.assignedClasses?.length || 0), 0) / teachers.length).toFixed(1)
                 : 0}
             </div>
           </CardContent>
@@ -479,8 +479,8 @@ export default function TeachersList() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {teacher.assignedClasses.length > 0 ? (
-                            teacher.assignedClasses.map(c => (
+                          {(teacher.assignedClasses?.length || 0) > 0 ? (
+                            (teacher.assignedClasses || []).map(c => (
                               <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
                             ))
                           ) : (

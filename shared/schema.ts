@@ -70,6 +70,8 @@ export type Complaint = {
   id: number;
   schoolId?: number | null;
   studentId?: number | null;
+  createdByUserId?: number | null;
+  createdByRole?: z.infer<typeof roleSchema> | null;
   title: string;
   content: string;
   isAnonymous: boolean;
@@ -185,6 +187,8 @@ export const insertAttendanceSchema = z.object({
 export const insertComplaintSchema = z.object({
   schoolId: z.number().optional(),
   studentId: z.number().optional(),
+  createdByUserId: z.number().optional(),
+  createdByRole: roleSchema.optional(),
   title: z.string(),
   content: z.string(),
   isAnonymous: z.boolean().optional(),

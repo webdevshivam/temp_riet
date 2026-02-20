@@ -54,6 +54,11 @@ export interface IStorage {
 
   getStudents(schoolId?: number): Promise<(Student & { user?: User })[]>;
   getStudent(id: number): Promise<(Student & { user?: User }) | undefined>;
+  getStudentByUserId(userId: number): Promise<(Student & { user?: User }) | undefined>;
+  updateStudentResult(
+    id: number,
+    patch: { marks: number; aiPerformanceSummary?: string; scholarshipEligible?: boolean },
+  ): Promise<(Student & { user?: User }) | undefined>;
   createStudent(
     student: InsertStudent,
     user?: Omit<InsertUser, "role">,
@@ -67,6 +72,7 @@ export interface IStorage {
 
   getAttendance(studentId?: number, schoolId?: number): Promise<Attendance[]>;
   createAttendance(att: InsertAttendance): Promise<Attendance>;
+  upsertTodayAttendance(att: InsertAttendance): Promise<Attendance>;
 
   getComplaints(): Promise<Complaint[]>;
   createComplaint(complaint: InsertComplaint): Promise<Complaint>;
@@ -77,6 +83,14 @@ export interface IStorage {
   getBlockchainResults(studentId?: number): Promise<BlockchainResult[]>;
   createBlockchainResult(result: InsertBlockchainResult): Promise<BlockchainResult>;
   verifyBlockchainResult(hash: string): Promise<BlockchainResult | undefined>;
+}
+
+function dayRange(date = new Date()) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
 }
 
 export class DatabaseStorage implements IStorage {
@@ -173,6 +187,14 @@ export class DatabaseStorage implements IStorage {
     return { ...student, user };
   }
 
+  async getStudentByUserId(userId: number): Promise<(Student & { user?: User }) | undefined> {
+    await connectToDatabase();
+    const student = cleanDoc<Student>(await StudentModel.findOne({ userId }).lean());
+    if (!student) return undefined;
+    const user = cleanDoc<User>(await UserModel.findOne({ id: student.userId }).lean());
+    return { ...student, user };
+  }
+
   async createStudent(
     insertStudent: InsertStudent,
     userParams?: Omit<InsertUser, "role">,
@@ -198,6 +220,30 @@ export class DatabaseStorage implements IStorage {
     });
     const student = cleanDoc<Student>(created.toObject()) as Student;
     return { ...student, user: createdUser };
+  }
+
+  async updateStudentResult(
+    id: number,
+    patch: { marks: number; aiPerformanceSummary?: string; scholarshipEligible?: boolean },
+  ): Promise<(Student & { user?: User }) | undefined> {
+    await connectToDatabase();
+    const updated = await StudentModel.findOneAndUpdate(
+      { id },
+      {
+        $set: {
+          marks: patch.marks,
+          aiPerformanceSummary: patch.aiPerformanceSummary ?? null,
+          ...(patch.scholarshipEligible !== undefined
+            ? { scholarshipEligible: patch.scholarshipEligible }
+            : {}),
+        },
+      },
+      { new: true },
+    ).lean();
+    const student = cleanDoc<Student>(updated);
+    if (!student) return undefined;
+    const user = cleanDoc<User>(await UserModel.findOne({ id: student.userId }).lean());
+    return { ...student, user };
   }
 
   async getTeachers(schoolId?: number): Promise<(Teacher & { user?: User })[]> {
@@ -313,6 +359,32 @@ export class DatabaseStorage implements IStorage {
       date: new Date(),
     });
     return cleanDoc<Attendance>(created.toObject()) as Attendance;
+  }
+
+  async upsertTodayAttendance(insertAttendance: InsertAttendance): Promise<Attendance> {
+    await connectToDatabase();
+    const { start, end } = dayRange();
+    const existing = await AttendanceModel.findOne({
+      studentId: insertAttendance.studentId,
+      date: { $gte: start, $lte: end },
+    }).lean();
+
+    if (existing) {
+      const updated = await AttendanceModel.findOneAndUpdate(
+        { id: (existing as any).id },
+        {
+          $set: {
+            status: insertAttendance.status,
+            faceVerified: insertAttendance.faceVerified ?? false,
+            markedByTeacherId: insertAttendance.markedByTeacherId ?? null,
+          },
+        },
+        { new: true },
+      ).lean();
+      return cleanDoc<Attendance>(updated) as Attendance;
+    }
+
+    return this.createAttendance(insertAttendance);
   }
 
   async getComplaints(): Promise<Complaint[]> {

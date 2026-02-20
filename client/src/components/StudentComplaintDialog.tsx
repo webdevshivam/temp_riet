@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const COMPLAINT_CATEGORIES = [
@@ -24,9 +23,7 @@ export function StudentComplaintDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     title: "",
@@ -89,20 +86,11 @@ export function StudentComplaintDialog({
       return;
     }
 
-    // Get student record to link complaint
-    const studentsResponse = await fetch("/api/students", {
-      credentials: "include",
-    });
-    const students = await studentsResponse.json();
-    const currentStudent = students.find((s: any) => s.userId === user?.id);
-
     createComplaint.mutate({
       title: formData.title,
       content: formData.content,
       isAnonymous: formData.isAnonymous,
       aiClassification: formData.category,
-      schoolId: currentStudent?.schoolId,
-      studentId: currentStudent?.id,
     });
   };
 

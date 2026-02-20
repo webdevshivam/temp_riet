@@ -39,6 +39,17 @@ export default function Complaints() {
     },
   });
 
+  const { data: teachers } = useQuery<any[]>({
+    queryKey: ["/api/teachers"],
+    queryFn: async () => {
+      const response = await fetch("/api/teachers", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch teachers");
+      return response.json();
+    },
+  });
+
   const { data: schools } = useQuery<any[]>({
     queryKey: ["/api/schools"],
     queryFn: async () => {
@@ -65,6 +76,11 @@ export default function Complaints() {
     return schools?.find((s) => s.id === schoolId);
   };
 
+  const getTeacherInfoByUserId = (userId?: number) => {
+    if (!userId) return null;
+    return teachers?.find((t) => t.userId === userId);
+  };
+
   const formatDate = (date: Date | string) => {
     const d = new Date(date);
     const now = new Date();
@@ -86,7 +102,7 @@ export default function Complaints() {
     <div className="space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold font-display text-orange-600 dark:text-orange-400">Complaints & Reports</h1>
+          <h1 className="text-3xl font-bold font-display text-primary">Complaints & Reports</h1>
           <p className="text-muted-foreground">AI-classified anonymous reporting system with student tracking</p>
         </div>
       </div>
@@ -144,6 +160,7 @@ export default function Complaints() {
           filteredComplaints.map((complaint) => {
             const student = getStudentInfo(complaint.studentId);
             const school = getSchoolInfo(complaint.schoolId);
+            const teacher = getTeacherInfoByUserId(complaint.createdByUserId);
             
             return (
               <Card key={complaint.id} className="hover:shadow-md transition-shadow">
@@ -163,6 +180,9 @@ export default function Complaints() {
                           Anonymous
                         </Badge>
                       )}
+                      <Badge variant="outline" className="text-xs">
+                        {complaint.createdByRole === "teacher" ? "Teacher Complaint" : complaint.createdByRole === "student" ? "Student Complaint" : "General Complaint"}
+                      </Badge>
                     </div>
                     {complaint.status === 'resolved' ? (
                       <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -179,12 +199,18 @@ export default function Complaints() {
                   <CardTitle className="text-lg mt-2">{complaint.title}</CardTitle>
                   
                   {/* Student/School Info */}
-                  {!complaint.isAnonymous && (student || school) && (
+                  {!complaint.isAnonymous && (student || teacher || school) && (
                     <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
                       {student && (
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           {student.user?.name || 'Unknown Student'} ({student.grade})
+                        </div>
+                      )}
+                      {teacher && (
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {teacher.user?.name || "Unknown Teacher"} (Teacher)
                         </div>
                       )}
                       {school && (

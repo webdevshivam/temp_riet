@@ -226,6 +226,25 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    createResult: {
+      method: 'POST' as const,
+      path: '/api/teachers/results' as const,
+      input: z.object({
+        studentId: z.number(),
+        term: z.string().min(1),
+        marks: z.number().min(0).max(100),
+        aiPerformanceSummary: z.string().optional(),
+      }),
+      responses: {
+        201: z.object({
+          student: studentWithDetailsSchema,
+          result: z.custom<BlockchainResult>(),
+        }),
+        400: errorSchemas.validation,
+        403: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
   },
   attendance: {
     list: {

@@ -206,7 +206,7 @@ export default function SchoolAdminDashboard() {
               <span className="text-sm">Manage Teachers</span>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setLocation("/complaints")}>
-              <AlertTriangle className="h-6 w-6 text-orange-500" />
+              <AlertTriangle className="h-6 w-6 text-primary" />
               <span className="text-sm">View Complaints</span>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setLocation("/analytics")}>

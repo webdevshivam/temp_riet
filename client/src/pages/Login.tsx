@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, Loader2, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
@@ -78,15 +78,7 @@ export default function Login() {
       <div className="w-full max-w-md space-y-8 relative z-10">
         {/* Logo and Header */}
         <div className="text-center space-y-4">
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-orange-400 dark:bg-orange-600 rounded-full blur-2xl opacity-40 animate-pulse"></div>
-              <div className="relative bg-orange-500 p-4 rounded-3xl shadow-2xl shadow-orange-500/30">
-                <GraduationCap className="h-12 w-12 text-white" />
-              </div>
-            </div>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-orange-600 dark:text-orange-400">
+          <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-primary">
             EduTrack
           </h1>
           <p className="text-muted-foreground text-lg">Welcome back! Let's get started</p>

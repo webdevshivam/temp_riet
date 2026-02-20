@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,14 @@ import { StudentComplaintDialog } from "@/components/StudentComplaintDialog";
 export default function StudentDashboard() {
   const { user } = useAuth();
   const [complaintDialogOpen, setComplaintDialogOpen] = useState(false);
+  const { data: complaints = [] } = useQuery<any[]>({
+    queryKey: ["/api/complaints"],
+    queryFn: async () => {
+      const res = await fetch("/api/complaints", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch complaints");
+      return res.json();
+    },
+  });
 
   const container = {
     hidden: { opacity: 0 },
@@ -26,9 +35,9 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-8">
       <div className="relative">
-        <div className="absolute -top-6 -left-6 w-32 h-32 bg-orange-200/30 dark:bg-orange-900/20 rounded-full blur-3xl"></div>
+        <div className="absolute -top-6 -left-6 w-32 h-32 bg-primary/15 rounded-full blur-3xl"></div>
         <div className="relative">
-          <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-orange-600 dark:text-orange-400">
+          <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-primary">
             Welcome back, {user?.name}!
           </h1>
           <p className="text-muted-foreground mt-3 text-lg">Here's your academic overview</p>
@@ -105,10 +114,10 @@ export default function StudentDashboard() {
       </motion.div>
 
       {/* Alerts */}
-      <Card className="bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/50">
+      <Card className="bg-primary/5 border-primary/20">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-orange-500" />
+            <AlertCircle className="h-5 w-5 text-primary" />
             Important Notices
           </CardTitle>
         </CardHeader>
@@ -155,7 +164,7 @@ export default function StudentDashboard() {
               className="h-auto py-4 flex-col gap-2"
               onClick={() => setComplaintDialogOpen(true)}
             >
-              <AlertCircle className="h-6 w-6 text-orange-500" />
+              <AlertCircle className="h-6 w-6 text-primary" />
               <span className="text-sm">File Complaint</span>
             </Button>
           </CardContent>
@@ -182,6 +191,30 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="warm-shadow">
+        <CardHeader>
+          <CardTitle>My Complaints</CardTitle>
+          <CardDescription>Track complaints submitted by you</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {complaints.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No complaints submitted yet.</p>
+          ) : (
+            complaints.slice(0, 5).map((c) => (
+              <div key={c.id} className="p-3 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-sm">{c.title}</p>
+                  <span className={`text-xs px-2 py-1 rounded-full ${c.status === "resolved" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                    {c.status}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{c.aiClassification || "other"}</p>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {/* Complaint Dialog */}
       <StudentComplaintDialog 

@@ -103,6 +103,14 @@ const complaintSchema = new Schema(
   {
     id: { type: Number, required: true, unique: true, index: true },
     schoolId: { type: Number, default: null, index: true },
+    studentId: { type: Number, default: null, index: true },
+    createdByUserId: { type: Number, default: null, index: true },
+    createdByRole: {
+      type: String,
+      enum: ["gov_admin", "school_admin", "teacher", "student"],
+      default: null,
+      index: true,
+    },
     title: { type: String, required: true },
     content: { type: String, required: true },
     isAnonymous: { type: Boolean, default: false },

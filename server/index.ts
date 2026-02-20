@@ -105,10 +105,23 @@ app.use((req, res, next) => {
 
   const port = parseInt(process.env.PORT || "3000", 10);
   const host = process.env.HOST || "localhost";
-  httpServer.listen(
-    { port, host },
-    () => {
-      log(`serving on http://${host}:${port}`);
-    },
-  );
+  let currentPort = port;
+
+  const startServer = () => {
+    httpServer.listen({ port: currentPort, host }, () => {
+      log(`serving on http://${host}:${currentPort}`);
+    });
+  };
+
+  httpServer.on("error", (err: any) => {
+    if (err?.code === "EADDRINUSE") {
+      currentPort += 1;
+      log(`port in use, retrying on ${currentPort}`);
+      startServer();
+      return;
+    }
+    throw err;
+  });
+
+  startServer();
 })();

@@ -92,6 +92,18 @@ export async function registerRoutes(
   });
 
   app.get(api.students.list.path, async (req, res) => {
+    const userId = (req as any).session?.userId;
+    if (userId) {
+      const currentUser = await storage.getUser(userId);
+      if (currentUser?.role === "teacher") {
+        const teacher = await storage.getTeacherByUserId(userId);
+        if (!teacher) return res.status(404).json({ message: "Teacher record not found" });
+        const students = await storage.getStudents(teacher.schoolId);
+        const filtered = students.filter((s) => teacher.assignedClasses.includes(s.grade));
+        return res.json(filtered);
+      }
+    }
+
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : undefined;
     const students = await storage.getStudents(schoolId);
     res.json(students);
@@ -183,15 +195,112 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.teachers.createResult.path, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const currentUser = await storage.getUser(userId);
+      if (currentUser?.role !== "teacher") {
+        return res.status(403).json({ message: "Only teachers can publish results" });
+      }
+
+      const teacher = await storage.getTeacherByUserId(userId);
+      if (!teacher) return res.status(404).json({ message: "Teacher record not found" });
+
+      const input = api.teachers.createResult.input.parse(req.body);
+      const student = await storage.getStudent(input.studentId);
+      if (!student) return res.status(404).json({ message: "Student not found" });
+
+      const isAssigned =
+        student.schoolId === teacher.schoolId &&
+        teacher.assignedClasses.includes(student.grade);
+      if (!isAssigned) {
+        return res.status(403).json({ message: "You can only publish results for assigned students" });
+      }
+
+      const updatedStudent = await storage.updateStudentResult(input.studentId, {
+        marks: input.marks,
+        aiPerformanceSummary: input.aiPerformanceSummary,
+      });
+      if (!updatedStudent) return res.status(404).json({ message: "Student not found" });
+
+      const scholarshipCheck = await storage.evaluateScholarship(input.studentId);
+      const finalStudent = await storage.updateStudentResult(input.studentId, {
+        marks: input.marks,
+        aiPerformanceSummary: input.aiPerformanceSummary,
+        scholarshipEligible: scholarshipCheck.eligible,
+      });
+
+      const { createHash } = await import("crypto");
+      const reportHash = `0x${createHash("sha256")
+        .update(`${input.studentId}|${input.term}|${input.marks}|${Date.now()}`)
+        .digest("hex")}`;
+
+      const result = await storage.createBlockchainResult({
+        studentId: input.studentId,
+        term: input.term,
+        reportHash,
+        isVerified: true,
+        aiExplanation:
+          input.aiPerformanceSummary ||
+          `Result published by ${teacher.user?.name || "Teacher"} for term ${input.term}.`,
+      });
+
+      res.status(201).json({ student: finalStudent || updatedStudent, result });
+    } catch (e) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
   app.get(api.attendance.list.path, async (req, res) => {
-    const att = await storage.getAttendance();
+    const studentId = req.query.studentId ? Number(req.query.studentId) : undefined;
+    const schoolId = req.query.schoolId ? Number(req.query.schoolId) : undefined;
+
+    const userId = (req as any).session?.userId;
+    if (userId) {
+      const currentUser = await storage.getUser(userId);
+      if (currentUser?.role === "teacher") {
+        const teacher = await storage.getTeacherByUserId(userId);
+        if (!teacher) return res.status(404).json({ message: "Teacher record not found" });
+        const students = await storage.getStudents(teacher.schoolId);
+        const allowedStudentIds = new Set(
+          students.filter((s) => teacher.assignedClasses.includes(s.grade)).map((s) => s.id),
+        );
+        const att = await storage.getAttendance(studentId, teacher.schoolId);
+        return res.json(att.filter((a) => allowedStudentIds.has(a.studentId)));
+      }
+    }
+
+    const att = await storage.getAttendance(studentId, schoolId);
     res.json(att);
   });
 
   app.post(api.attendance.create.path, async (req, res) => {
     try {
       const input = api.attendance.create.input.parse(req.body);
-      const att = await storage.createAttendance(input);
+      const userId = (req as any).session?.userId;
+      if (userId) {
+        const currentUser = await storage.getUser(userId);
+        if (currentUser?.role === "teacher") {
+          const teacher = await storage.getTeacherByUserId(userId);
+          if (!teacher) return res.status(404).json({ message: "Teacher record not found" });
+          const student = await storage.getStudent(input.studentId);
+          if (!student) return res.status(404).json({ message: "Student not found" });
+          const isAssigned =
+            student.schoolId === teacher.schoolId &&
+            teacher.assignedClasses.includes(student.grade);
+          if (!isAssigned) {
+            return res.status(403).json({ message: "You can only mark attendance for assigned students" });
+          }
+          const att = await storage.upsertTodayAttendance({
+            ...input,
+            markedByTeacherId: teacher.id,
+          });
+          return res.status(201).json(att);
+        }
+      }
+
+      const att = await storage.upsertTodayAttendance(input);
       res.status(201).json(att);
     } catch (e) {
       res.status(400).json({ message: "Invalid input" });
@@ -230,6 +339,21 @@ export async function registerRoutes(
       if (!student) {
         return res.status(404).json({ message: 'Student not found' });
       }
+
+      const userId = (req as any).session?.userId;
+      if (userId) {
+        const currentUser = await storage.getUser(userId);
+        if (currentUser?.role === "teacher") {
+          const teacher = await storage.getTeacherByUserId(userId);
+          if (!teacher) return res.status(404).json({ message: "Teacher record not found" });
+          const isAssigned =
+            student.schoolId === teacher.schoolId &&
+            teacher.assignedClasses.includes(student.grade);
+          if (!isAssigned) {
+            return res.status(403).json({ message: "You can only mark attendance for assigned students" });
+          }
+        }
+      }
       
       if (!(student as any).faceImageBase64) {
         return res.status(400).json({ message: 'No face data registered for this student' });
@@ -249,10 +373,17 @@ export async function registerRoutes(
       
       // If match, create attendance record
       if (result.match) {
-        await storage.createAttendance({
+        let markedByTeacherId: number | undefined = undefined;
+        if (userId) {
+          const teacher = await storage.getTeacherByUserId(userId);
+          markedByTeacherId = teacher?.id;
+        }
+
+        await storage.upsertTodayAttendance({
           studentId,
           status: 'present',
           faceVerified: true,
+          markedByTeacherId,
         });
       }
       
@@ -268,14 +399,51 @@ export async function registerRoutes(
   });
 
   app.get(api.complaints.list.path, async (req, res) => {
-    const complaints = await storage.getComplaints();
+    const userId = (req as any).session?.userId;
+    let complaints = await storage.getComplaints();
+
+    if (userId) {
+      const user = await storage.getUser(userId);
+      if (user?.role === "student" || user?.role === "teacher") {
+        complaints = complaints.filter((c) => c.createdByUserId === userId);
+      } else if (user?.role === "school_admin" && user.schoolId) {
+        complaints = complaints.filter((c) => c.schoolId === user.schoolId);
+      }
+    }
+
     res.json(complaints);
   });
 
   app.post(api.complaints.create.path, async (req, res) => {
     try {
       const input = api.complaints.create.input.parse(req.body);
-      const comp = await storage.createComplaint(input);
+      const userId = (req as any).session?.userId;
+      const currentUser = userId ? await storage.getUser(userId) : undefined;
+
+      let payload: any = {
+        ...input,
+        createdByUserId: currentUser?.id ?? input.createdByUserId,
+        createdByRole: currentUser?.role ?? input.createdByRole,
+      };
+
+      if (currentUser?.role === "student") {
+        const student = await storage.getStudentByUserId(currentUser.id);
+        payload = {
+          ...payload,
+          studentId: student?.id ?? payload.studentId,
+          schoolId: student?.schoolId ?? currentUser.schoolId ?? payload.schoolId,
+        };
+      } else if (currentUser?.role === "teacher") {
+        const teacher = await storage.getTeacherByUserId(currentUser.id);
+        payload = {
+          ...payload,
+          schoolId: teacher?.schoolId ?? currentUser.schoolId ?? payload.schoolId,
+        };
+      } else if (currentUser?.schoolId && !payload.schoolId) {
+        payload.schoolId = currentUser.schoolId;
+      }
+
+      const comp = await storage.createComplaint(payload);
       res.status(201).json(comp);
     } catch (e) {
       res.status(400).json({ message: "Invalid input" });

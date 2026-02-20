@@ -1,193 +1,260 @@
-import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useTeacherMe } from "@/hooks/use-teachers";
+import { useStudents } from "@/hooks/use-students";
+import { useAttendance, useMarkAttendance } from "@/hooks/use-attendance";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, Calendar, ClipboardCheck, Award, TrendingUp } from "lucide-react";
-import { motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CheckCircle, Users, BookOpen, ClipboardCheck, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { StudentComplaintDialog } from "@/components/StudentComplaintDialog";
 
 export default function TeacherDashboard() {
-  const { user } = useAuth();
-  const [, setLocation] = useLocation();
+  const [selectedClass, setSelectedClass] = useState<string>("all");
+  const [complaintDialogOpen, setComplaintDialogOpen] = useState(false);
+  const { data: teacher, isLoading: teacherLoading } = useTeacherMe();
+  const { data: students = [], isLoading: studentsLoading } = useStudents();
+  const { data: attendance = [], isLoading: attendanceLoading } = useAttendance();
+  const markAttendance = useMarkAttendance();
+  const { toast } = useToast();
+  const { data: complaints = [] } = useQuery<any[]>({
+    queryKey: ["/api/complaints"],
+    queryFn: async () => {
+      const res = await fetch("/api/complaints", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch complaints");
+      return res.json();
+    },
+  });
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+  const assignedClasses = teacher?.assignedClasses || [];
+
+  const filteredStudents = useMemo(() => {
+    if (selectedClass === "all") return students;
+    return students.filter((s) => s.grade === selectedClass);
+  }, [students, selectedClass]);
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayMap = useMemo(() => {
+    const m = new Map<number, { status: string; faceVerified: boolean }>();
+    attendance.forEach((a) => {
+      const d = new Date(a.date).toISOString().split("T")[0];
+      if (d === today) m.set(a.studentId, { status: a.status, faceVerified: a.faceVerified });
+    });
+    return m;
+  }, [attendance, today]);
+
+  const presentCount = filteredStudents.filter((s) => todayMap.get(s.id)?.status === "present").length;
+
+  const onMark = (studentId: number, status: "present" | "absent" | "late") => {
+    markAttendance.mutate(
+      {
+        studentId,
+        status,
+        faceVerified: false,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Attendance updated", description: `Marked ${status}.` });
+        },
+        onError: (err: Error) => {
+          toast({ title: "Error", description: err.message, variant: "destructive" });
+        },
+      },
+    );
   };
 
-  const item = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1 }
-  };
+  if (teacherLoading || studentsLoading || attendanceLoading) {
+    return <div className="p-8">Loading teacher panel...</div>;
+  }
+
+  if (!teacher) {
+    return <div className="p-8 text-muted-foreground">Teacher profile not found.</div>;
+  }
+
+  if (assignedClasses.length === 0) {
+    return (
+      <div className="p-8 text-muted-foreground">
+        No batches assigned yet. Ask admin to assign classes to your teacher account.
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div className="relative">
-        <div className="absolute -top-6 -left-6 w-32 h-32 bg-green-200/30 dark:bg-green-900/20 rounded-full blur-3xl"></div>
-        <div className="relative">
-          <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-green-600 dark:text-green-400">
-            Welcome back, {user?.name}!
-          </h1>
-          <p className="text-muted-foreground mt-3 text-lg">Teacher Dashboard - Manage your classes and students</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-2">
+          <ClipboardCheck className="h-8 w-8 text-primary" />
+          Teacher Panel
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          {teacher.user?.name} - {teacher.subject} - Batches: {assignedClasses.join(", ")}
+        </p>
       </div>
 
-      <motion.div 
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
-      >
-        <motion.div variants={item}>
-          <Card className="stat-card from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/20 border-blue-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-blue-900 dark:text-blue-100">My Students</CardTitle>
-              <div className="bg-blue-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">127</div>
-              <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">Across 4 classes</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={item}>
-          <Card className="stat-card from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/20 border-green-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-green-900 dark:text-green-100">Classes Assigned</CardTitle>
-              <div className="bg-green-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400">4</div>
-              <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">Mathematics courses</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={item}>
-          <Card className="stat-card from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/20 border-purple-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-purple-900 dark:text-purple-100">Pending Assignments</CardTitle>
-              <div className="bg-purple-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <ClipboardCheck className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">23</div>
-              <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">To be graded</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={item}>
-          <Card className="stat-card from-amber-50 to-amber-100/50 dark:from-amber-950/20 dark:to-amber-900/20 border-amber-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-amber-900 dark:text-amber-100">Avg Class Score</CardTitle>
-              <div className="bg-amber-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <TrendingUp className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">82%</div>
-              <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> +5% from last month
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Quick Actions */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card className="warm-shadow">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Assigned Batches</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setLocation("/students")}>
-              <Users className="h-6 w-6 text-blue-500" />
-              <span className="text-sm">My Students</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setLocation("/attendance")}>
-              <Calendar className="h-6 w-6 text-green-500" />
-              <span className="text-sm">Take Attendance</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setLocation("/courses")}>
-              <BookOpen className="h-6 w-6 text-purple-500" />
-              <span className="text-sm">Course Materials</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-              <ClipboardCheck className="h-6 w-6 text-orange-500" />
-              <span className="text-sm">Grade Assignments</span>
-            </Button>
+          <CardContent>
+            <div className="text-2xl font-bold">{assignedClasses.length}</div>
           </CardContent>
         </Card>
-
-        <Card className="warm-shadow">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Assigned Students</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-semibold text-sm">Chapter 5 Test</p>
-                <p className="text-xs text-muted-foreground">Grade 10-A</p>
-              </div>
-              <Badge className="bg-green-500">Completed</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-semibold text-sm">Assignment Review</p>
-                <p className="text-xs text-muted-foreground">Grade 10-B</p>
-              </div>
-              <Badge className="bg-amber-500">In Progress</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-semibold text-sm">Parent Meeting</p>
-                <p className="text-xs text-muted-foreground">Tomorrow 10 AM</p>
-              </div>
-              <Badge variant="outline">Scheduled</Badge>
+          <CardContent>
+            <div className="text-2xl font-bold">{filteredStudents.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {presentCount} / {filteredStudents.length}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Student Performance Overview */}
-      <Card className="warm-shadow">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>My Complaints</CardTitle>
+            <CardDescription>Submit and track your complaints</CardDescription>
+          </div>
+          <Button onClick={() => setComplaintDialogOpen(true)} className="gap-2">
+            <AlertCircle className="h-4 w-4" />
+            New Complaint
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {complaints.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No complaints submitted yet.</div>
+          ) : (
+            complaints.slice(0, 5).map((c) => (
+              <div key={c.id} className="p-3 border rounded-md">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">{c.title}</div>
+                  <Badge variant={c.status === "resolved" ? "secondary" : "outline"}>{c.status}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">{c.aiClassification || "other"}</div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">Batch</span>
+        <Select value={selectedClass} onValueChange={setSelectedClass}>
+          <SelectTrigger className="w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Batches</SelectItem>
+            {assignedClasses.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5 text-green-500" />
-            Top Performing Students
-          </CardTitle>
+          <CardTitle>Mark Attendance</CardTitle>
+          <CardDescription>
+            Only students assigned to your batches are shown here.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[
-              { name: "Sarah Johnson", grade: "10-A", score: 98 },
-              { name: "Michael Chen", grade: "10-B", score: 96 },
-              { name: "Emma Williams", grade: "10-A", score: 94 },
-            ].map((student, idx) => (
-              <div key={idx} className="flex justify-between items-center p-3 border rounded-lg">
-                <div>
-                  <p className="font-semibold">{student.name}</p>
-                  <p className="text-xs text-muted-foreground">Grade {student.grade}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-green-600">{student.score}%</p>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Reg No</TableHead>
+                  <TableHead>Batch</TableHead>
+                  <TableHead>Status Today</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No students in selected batch.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredStudents.map((s) => {
+                    const todayStatus = todayMap.get(s.id);
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">
+                          <div>{s.user?.name || "Unknown"}</div>
+                          <div className="text-xs text-muted-foreground">@{s.user?.username}</div>
+                        </TableCell>
+                        <TableCell>{s.registrationNo}</TableCell>
+                        <TableCell>{s.grade}</TableCell>
+                        <TableCell>
+                          {todayStatus ? (
+                            <Badge variant={todayStatus.status === "present" ? "default" : "secondary"}>
+                              {todayStatus.status}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">not marked</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => onMark(s.id, "present")}
+                              disabled={markAttendance.isPending}
+                            >
+                              Present
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => onMark(s.id, "late")}
+                              disabled={markAttendance.isPending}
+                            >
+                              Late
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onMark(s.id, "absent")}
+                              disabled={markAttendance.isPending}
+                            >
+                              Absent
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
+
+      <StudentComplaintDialog open={complaintDialogOpen} onOpenChange={setComplaintDialogOpen} />
     </div>
   );
 }
