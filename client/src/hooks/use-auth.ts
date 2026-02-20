@@ -63,7 +63,9 @@ export function useAuth() {
       await fetch(api.auth.logout.path, { method: "POST" });
     },
     onSuccess: () => {
+      queryClient.clear();
       queryClient.setQueryData([api.auth.me.path], null);
+      window.location.href = "/login";
     },
   });
 

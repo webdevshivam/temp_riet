@@ -1,9 +1,9 @@
 import { useDashboardAnalytics } from "@/hooks/use-dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { School, Users, AlertTriangle, TrendingUp, BarChart3, TrendingUpIcon, Award } from "lucide-react";
-import { motion } from "framer-motion";
+import { School, Users, AlertTriangle, TrendingUp, BarChart3, Award } from "lucide-react";
 import { ScholarshipRecommendations } from "@/components/ScholarshipRecommendations";
+import { useAuth } from "@/hooks/use-auth";
 
 const TEACHER_SHORTAGE_DATA = [
   { subject: 'Math', shortage: 24, available: 120 },
@@ -22,156 +22,88 @@ const PERFORMANCE_DATA = [
 
 export default function GovDashboard() {
   const { data: analytics, isLoading } = useDashboardAnalytics();
+  const { user } = useAuth();
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading analytics...</div>;
 
-  const item = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1 }
-  };
-
-  if (isLoading) return <div className="p-8">Loading analytics...</div>;
+  const stats = [
+    { label: "Total Schools", value: analytics?.totalSchools ?? 0, icon: School, change: "+2 this month" },
+    { label: "Total Students", value: analytics?.totalStudents ?? 0, icon: Users, change: "Enrolled" },
+    { label: "Teacher Shortage", value: analytics?.teacherShortageCount ?? 0, icon: AlertTriangle, change: "Positions needed" },
+    { label: "Avg Attendance", value: `${analytics?.averageAttendance ?? 0}%`, icon: TrendingUp, change: "Across all schools" },
+  ];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="relative">
-        <div className="absolute -top-6 -left-6 w-32 h-32 bg-orange-200/30 dark:bg-orange-900/20 rounded-full blur-3xl"></div>
-        <div className="relative">
-          <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight text-orange-600 dark:text-orange-400">
-            Government Overview
-          </h1>
-          <p className="text-muted-foreground mt-3 text-lg">National education metrics and insights at a glance</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold font-display tracking-tight">Welcome back, {user?.username}</h1>
+        <p className="text-muted-foreground mt-1">National education metrics at a glance</p>
       </div>
 
-      <motion.div 
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
-      >
-        <motion.div variants={item}>
-          <Card className="stat-card from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/20 border-orange-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-orange-900 dark:text-orange-100">Total Schools</CardTitle>
-              <div className="bg-orange-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <School className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">{analytics?.totalSchools || 42}</div>
-              <p className="text-xs text-orange-600/70 dark:text-orange-400/70 mt-1 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> +2 from last month
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-        
-        <motion.div variants={item}>
-          <Card className="stat-card from-rose-50 to-pink-100/50 dark:from-rose-950/20 dark:to-pink-900/20 border-rose-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-rose-900 dark:text-rose-100">Total Students</CardTitle>
-              <div className="bg-rose-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-rose-600 dark:text-rose-400">{analytics?.totalStudents || 12543}</div>
-              <p className="text-xs text-rose-600/70 dark:text-rose-400/70 mt-1 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> +12% enrollment rate
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label} className="shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-muted-foreground font-medium">{s.label}</span>
+                  <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                    <Icon className="h-4.5 w-4.5 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="text-2xl font-bold">{s.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">{s.change}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-        <motion.div variants={item}>
-          <Card className="stat-card from-amber-50 to-yellow-100/50 dark:from-amber-950/20 dark:to-yellow-900/20 border-amber-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-amber-900 dark:text-amber-100">Teacher Shortage</CardTitle>
-              <div className="bg-amber-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <AlertTriangle className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{analytics?.teacherShortageCount || 156}</div>
-              <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">
-                Critical in rural areas
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={item}>
-          <Card className="stat-card from-emerald-50 to-green-100/50 dark:from-emerald-950/20 dark:to-green-900/20 border-emerald-200/50 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Avg Performance</CardTitle>
-              <div className="bg-emerald-500 p-2.5 rounded-xl shadow-lg group-hover:scale-110 transition-transform">
-                <TrendingUp className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">84%</div>
-              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> +4.5% year over year
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="col-span-1 warm-shadow border-orange-100/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-orange-500" />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
               Teacher Shortage by Subject
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={TEACHER_SHORTAGE_DATA}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="subject" />
-                  <YAxis />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 90%)" />
+                  <XAxis dataKey="subject" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid hsl(220 13% 90%)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 13 }}
                   />
-                  <Bar dataKey="available" fill="#fed7aa" radius={[8, 8, 0, 0]} name="Available" />
-                  <Bar dataKey="shortage" fill="#f97316" radius={[8, 8, 0, 0]} name="Shortage" />
+                  <Bar dataKey="available" fill="hsl(220 14% 86%)" radius={[4, 4, 0, 0]} name="Available" />
+                  <Bar dataKey="shortage" fill="hsl(234 85% 55%)" radius={[4, 4, 0, 0]} name="Shortage" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 warm-shadow border-rose-100/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <TrendingUpIcon className="h-5 w-5 text-rose-500" />
-              National Performance Trend
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              Performance Trend
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={PERFORMANCE_DATA}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="month" />
-                  <YAxis domain={[60, 100]} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 90%)" />
+                  <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis domain={[60, 100]} fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid hsl(220 13% 90%)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 13 }}
                   />
-                  <Line type="monotone" dataKey="score" stroke="#f43f5e" strokeWidth={3} dot={{ r: 5, fill: '#f43f5e' }} activeDot={{ r: 8, fill: '#e11d48' }} />
+                  <Line type="monotone" dataKey="score" stroke="hsl(234 85% 55%)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(234 85% 55%)' }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -179,11 +111,10 @@ export default function GovDashboard() {
         </Card>
       </div>
 
-      {/* Scholarship Recommendations */}
-      <Card className="warm-shadow border-amber-100/50">
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <Award className="h-5 w-5 text-amber-500" />
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Award className="h-4 w-4 text-muted-foreground" />
             Scholarship Recommendations
           </CardTitle>
         </CardHeader>

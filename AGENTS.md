@@ -4,7 +4,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-This is a full-stack education management system built with React (client), Express (server), and MongoDB (database). The application provides government dashboard analytics, school management, student/teacher tracking, attendance verification (with face recognition), blockchain-based result verification, anonymous complaints, and online courses.
+This is a full-stack education management system ("EduTrack") built with React (client), Express (server), and MongoDB (database). The application provides government dashboard analytics, school management, student/teacher tracking, attendance verification (with face recognition), blockchain-based result verification, anonymous complaints, scholarship evaluation, and online courses.
 
 ## Development Commands
 
@@ -14,9 +14,12 @@ This is a full-stack education management system built with React (client), Expr
 - **Production start**: `npm start` - Runs the production build from `dist/index.cjs`
 - **Type checking**: `npm run check` - Runs TypeScript compiler in check mode (no emit)
 
-### Port Configuration
-- Default port: 3000 (configurable via `PORT` environment variable)
-- Replit deployment: Port 5000 (configured in `.replit`)
+### Environment Variables
+- `PORT` - Server port (default: 3000, Replit uses 5000)
+- `HOST` - Server host (default: localhost)
+- `MONGODB_URI` - MongoDB connection string (default embedded in `server/db.ts`)
+- `MONGODB_DB` - Database name (default: `riet`)
+- `SESSION_SECRET` - Express session secret (default: `dev-secret`)
 
 ## Architecture
 
@@ -40,10 +43,11 @@ The codebase uses a monorepo pattern with three main directories:
 ### Server Architecture
 
 **Core files:**
-- `server/index.ts` - Express app setup, middleware, and HTTP server
-- `server/routes.ts` - API route handlers and database seeding logic
-- `server/db.ts` - Mongoose connection and schema definitions
-- `server/storage.ts` - Data access layer implementing `IStorage` interface
+- `server/index.ts` - Express app setup, middleware (sessions via memorystore), and HTTP server
+- `server/routes.ts` - API route handlers, `requireGov` auth middleware, and database seeding logic
+- `server/db.ts` - Mongoose connection and all Mongoose schema definitions (User, School, Student, Teacher, Attendance, Complaint, Course, BlockchainResult, ScholarshipRule)
+- `server/storage.ts` - Data access layer implementing `IStorage` interface via `DatabaseStorage` class
+- `server/services/face-recognition.ts` - Face comparison service (simplified pixel-based, not production-ready)
 - `server/vite.ts` - Vite middleware for development mode
 - `server/static.ts` - Static file serving for production
 
@@ -51,15 +55,20 @@ The codebase uses a monorepo pattern with three main directories:
 - Development: Uses Vite middleware for HMR (`server/vite.ts`)
 - Production: Serves pre-built static files from `dist/public/` (`server/static.ts`)
 
+**Authentication:**
+- Session-based auth using `express-session` with `memorystore`
+- Login auto-creates users if username doesn't exist (for demo/testing)
+- `requireGov` middleware in `server/routes.ts` guards admin-only endpoints (user management, reports export)
+- Sessions stored in `req.session.userId`; cookie max-age is 7 days
+
 **Database:**
 - MongoDB via Mongoose
-- Auto-incrementing integer IDs (not ObjectIds) for all entities
-- Connection managed by `connectToDatabase()` in `server/db.ts`
-- Default connection string embedded in `server/db.ts` (override with `MONGODB_URI` env var)
-- Database name: `riet` (override with `MONGODB_DB` env var)
+- Auto-incrementing integer IDs (not ObjectIds) for all entities — `nextId()` helper in `storage.ts`
+- `cleanDoc()` / `cleanDocs()` helpers strip `_id` and `__v` from Mongoose results
+- Connection is lazy — `connectToDatabase()` called at start of every storage method
 
 **Data Models:**
-User, School, Student, Teacher, Attendance, Complaint, Course, BlockchainResult
+User, School, Student, Teacher, Attendance, Complaint, Course, BlockchainResult, ScholarshipRule
 
 ### Client Architecture
 
@@ -89,9 +98,11 @@ User, School, Student, Teacher, Attendance, Complaint, Course, BlockchainResult
 - Courses - Online course catalog
 
 **Role-based UI:**
-- Simple role state (no full authentication implemented in client)
+- Session-based auth via `useAuth()` hook (`client/src/hooks/use-auth.ts`)
 - Roles: `gov_admin`, `school_admin`, `teacher`, `student`
-- Sidebar component adapts based on role
+- `ProtectedRoute` component redirects unauthenticated users to `/login`
+- Sidebar and dashboard page adapt based on user role
+- Login has mock fallback for demo if backend is unavailable
 
 ### API Contract System
 
@@ -100,6 +111,8 @@ The `shared/routes.ts` file defines a type-safe API contract:
 - Example usage: `api.schools.create.path`, `api.schools.create.input.parse()`
 - Both client and server import from this single source of truth
 - Zod schemas provide runtime validation and TypeScript types
+- `buildUrl()` helper replaces `:param` placeholders in paths
+- `apiRequest()` in `client/src/lib/queryClient.ts` is the standard mutation helper; queries use TanStack Query's `queryKey` as the fetch URL
 
 ### Build System
 
@@ -130,9 +143,10 @@ The `shared/routes.ts` file defines a type-safe API contract:
 - Shared tsconfig for client, server, and shared code
 
 ### Database Seeding
-- Automatic seeding runs on server startup if database is empty
-- Seed data includes default users (admin/password, teacher/password, student/password)
+- Automatic seeding runs on server startup if database is empty (checks `schools.length === 0`)
+- Seed data includes: 1 school (Springfield High), 3 users (admin/teacher/student, all password: `password`), 1 teacher, 1 student, 1 complaint, 1 course, 1 blockchain result
 - Located in `server/routes.ts` in `seedDatabase()` function
+- ScholarshipRule also has lazy-init defaults (minMarks: 85, minAttendance: 90) created on first access
 
 ### Error Handling
 - Server: Express error middleware catches all errors
@@ -146,12 +160,4 @@ The `shared/routes.ts` file defines a type-safe API contract:
 
 ## Testing
 
-No test framework is currently configured. When adding tests, update `tsconfig.json` to exclude test files.
-
-## MongoDB Connection
-
-The application expects MongoDB to be available. Connection details:
-- Default URI embedded in `server/db.ts` (MongoDB Atlas cluster)
-- Override with `MONGODB_URI` environment variable
-- Database name: `riet` (override with `MONGODB_DB`)
-- Connection is lazy - only connects when first database operation occurs
+No test framework is currently configured. `tsconfig.json` already excludes `**/*.test.ts` files.

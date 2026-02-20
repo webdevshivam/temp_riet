@@ -22,9 +22,9 @@ export default function Login() {
     
     if (!username || !password) {
       toast({
-        title: "Error",
+        title: "Missing credentials",
         description: "Please enter username and password",
-        variant: "destructive",
+        variant: "warning",
       });
       return;
     }
@@ -32,14 +32,15 @@ export default function Login() {
     login({ username, password, role } as any, {
       onSuccess: () => {
         toast({
-          title: "Success",
-          description: "Logged in successfully",
+          title: "Welcome back!",
+          description: "You've been signed in successfully",
+          variant: "success" as any,
         });
         setLocation("/");
       },
       onError: (error: Error) => {
         toast({
-          title: "Login Failed",
+          title: "Login failed",
           description: error.message || "Invalid credentials",
           variant: "destructive",
         });
@@ -56,8 +57,9 @@ export default function Login() {
       login({ username: preset.username, password: preset.password, role: preset.role } as any, {
         onSuccess: () => {
           toast({
-            title: "Success",
-            description: `Logged in as ${preset.username}`,
+            title: "Welcome back!",
+            description: `Signed in as ${preset.role.replace('_', ' ')}`,
+            variant: "success" as any,
           });
           setLocation("/");
         },

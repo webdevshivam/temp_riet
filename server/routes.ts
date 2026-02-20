@@ -92,7 +92,8 @@ export async function registerRoutes(
   });
 
   app.get(api.students.list.path, async (req, res) => {
-    const students = await storage.getStudents();
+    const schoolId = req.query.schoolId ? Number(req.query.schoolId) : undefined;
+    const students = await storage.getStudents(schoolId);
     res.json(students);
   });
 
@@ -119,7 +120,8 @@ export async function registerRoutes(
   });
 
   app.get(api.teachers.list.path, async (req, res) => {
-    const teachers = await storage.getTeachers();
+    const schoolId = req.query.schoolId ? Number(req.query.schoolId) : undefined;
+    const teachers = await storage.getTeachers(schoolId);
     res.json(teachers);
   });
 
