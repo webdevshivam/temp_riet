@@ -1,240 +1,285 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle, XCircle, User, Camera, ShieldCheck, Info } from "lucide-react";
-import { useFaceVerify } from "@/hooks/use-attendance";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CheckCircle, XCircle, Camera, ClipboardCheck, Users } from "lucide-react";
+import { useFaceVerify, useMarkAttendance, useAttendance } from "@/hooks/use-attendance";
 import { useStudents } from "@/hooks/use-students";
+import { useTeacherMe } from "@/hooks/use-teachers";
 import { useToast } from "@/hooks/use-toast";
 import { FaceCapture } from "@/components/FaceCapture";
 
 export default function FaceVerification() {
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedClass, setSelectedClass] = useState<string>("all");
+  const [faceStudentId, setFaceStudentId] = useState<number | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     success: boolean;
     studentName?: string;
     confidence?: number;
   } | null>(null);
-  
-  const { data: students } = useStudents();
-  const { mutate: verify, isPending } = useFaceVerify();
+
+  const { data: teacher, isLoading: teacherLoading } = useTeacherMe();
+  const { data: allStudents, isLoading: studentsLoading } = useStudents();
+  const { data: attendanceRecords } = useAttendance();
+  const { mutate: verify, isPending: verifyPending } = useFaceVerify();
+  const { mutate: markAttendance, isPending: markPending } = useMarkAttendance();
   const { toast } = useToast();
 
-  const handleCapture = (imageBase64: string) => {
-    if (!selectedStudentId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select a student first.",
-      });
-      return;
-    }
+  const assignedClasses = teacher?.assignedClasses ?? [];
 
-    verify({ imageBase64, studentId: selectedStudentId }, {
+  // Filter students to only those in teacher's assigned classes
+  const students = useMemo(() => {
+    if (!allStudents) return [];
+    if (assignedClasses.length === 0) return [];
+    return allStudents.filter(s => assignedClasses.includes(s.grade));
+  }, [allStudents, assignedClasses]);
+
+  // Further filter by selected class tab
+  const filteredStudents = useMemo(() => {
+    if (selectedClass === "all") return students;
+    return students.filter(s => s.grade === selectedClass);
+  }, [students, selectedClass]);
+
+  // Today's attendance records by studentId
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayAttendance = useMemo(() => {
+    const map = new Map<number, { status: string; faceVerified: boolean }>();
+    if (!attendanceRecords) return map;
+    for (const rec of attendanceRecords) {
+      const recDate = new Date(rec.date).toISOString().split("T")[0];
+      if (recDate === todayStr) {
+        map.set(rec.studentId, { status: rec.status, faceVerified: rec.faceVerified });
+      }
+    }
+    return map;
+  }, [attendanceRecords, todayStr]);
+
+  const handleMarkPresent = (studentId: number) => {
+    markAttendance({
+      studentId,
+      status: "present",
+      faceVerified: false,
+      markedByTeacherId: teacher?.id,
+    }, {
+      onSuccess: () => {
+        toast({ title: "Marked Present", description: "Attendance recorded successfully." });
+      },
+      onError: (err: Error) => {
+        toast({ variant: "destructive", title: "Error", description: err.message });
+      },
+    });
+  };
+
+  const handleFaceCapture = (imageBase64: string) => {
+    if (!faceStudentId) return;
+    verify({ imageBase64, studentId: faceStudentId }, {
       onSuccess: (data: any) => {
         setShowCapture(false);
         setVerificationResult({
           success: data.success,
           studentName: data.studentName,
-          confidence: data.matchConfidence
+          confidence: data.matchConfidence,
         });
-
         if (data.success) {
-          toast({
-            title: "Attendance Verified",
-            description: `${data.studentName} verified with ${data.matchConfidence}% confidence.`,
-          });
+          toast({ title: "Verified & Present", description: `${data.studentName} verified with ${data.matchConfidence}% confidence.` });
         } else {
-          toast({
-            variant: "destructive",
-            title: "Verification Failed",
-            description: "Face does not match. Please try again.",
-          });
+          toast({ variant: "destructive", title: "Verification Failed", description: "Face does not match." });
         }
       },
-      onError: (error: Error) => {
+      onError: (err: Error) => {
         setShowCapture(false);
-        toast({
-          variant: "destructive",
-          title: "Verification Error",
-          description: error.message || "An error occurred during verification.",
-        });
-      }
+        toast({ variant: "destructive", title: "Error", description: err.message });
+      },
     });
   };
 
-  const studentsWithFaces = students?.filter(s => (s as any).faceImageBase64) || [];
+  const presentCount = filteredStudents.filter(s => todayAttendance.has(s.id)).length;
+
+  if (teacherLoading || studentsLoading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!teacher) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p className="text-lg font-semibold">No teacher profile found for your account.</p>
+        <p className="text-sm mt-2">Please contact your admin to assign you as a teacher.</p>
+      </div>
+    );
+  }
+
+  if (assignedClasses.length === 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p className="text-lg font-semibold">No classes assigned to you yet.</p>
+        <p className="text-sm mt-2">Please contact your admin to assign classes.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold font-display flex items-center justify-center gap-3 text-orange-600 dark:text-orange-400">
-          <Camera className="h-8 w-8" />
-          Smart Attendance
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-2">
+          <ClipboardCheck className="h-8 w-8 text-primary" />
+          Mark Attendance
         </h1>
-        <p className="text-muted-foreground mt-2 text-lg">AI-Powered Face Verification System</p>
+        <p className="text-muted-foreground mt-1">
+          {teacher.user?.name} &mdash; {teacher.subject} &mdash; Classes: {assignedClasses.join(", ")}
+        </p>
       </div>
 
-      {/* Info Alert */}
-      <div className="mb-6 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-900 dark:text-blue-100">
-            <p className="font-semibold mb-1">How Face Verification Works:</p>
-            <ul className="space-y-1 text-blue-800 dark:text-blue-200">
-              <li>1. Select a student from the dropdown below</li>
-              <li>2. Click "Start Face Verification" to capture their face</li>
-              <li>3. The system compares the captured image with stored face data</li>
-              <li>4. If verified, attendance is automatically recorded</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Student Selection */}
-      <Card className="mb-6 warm-shadow border-orange-100/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-orange-500" />
-            Select Student
-          </CardTitle>
-          <CardDescription>Choose a student to verify their attendance</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="student-select">Student</Label>
-              <Select 
-                value={selectedStudentId?.toString() || ''} 
-                onValueChange={(v) => setSelectedStudentId(v ? Number(v) : null)}
-              >
-                <SelectTrigger id="student-select">
-                  <SelectValue placeholder="Select a student" />
-                </SelectTrigger>
-                <SelectContent>
-                  {studentsWithFaces.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No students with face data registered
-                    </SelectItem>
-                  ) : (
-                    studentsWithFaces.map((student) => (
-                      <SelectItem key={student.id} value={student.id.toString()}>
-                        {student.user?.name || 'Unknown'} - {student.grade}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Assigned Classes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{assignedClasses.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Students</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{filteredStudents.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {presentCount} / {filteredStudents.length}
             </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <Button
-              size="lg"
-              className="w-full gap-2"
-              onClick={() => setShowCapture(true)}
-              disabled={!selectedStudentId || isPending}
-            >
-              <Camera className="h-4 w-4" />
-              Start Face Verification
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Class filter */}
+      <div className="flex items-center gap-3">
+        <Label>Class:</Label>
+        <Select value={selectedClass} onValueChange={setSelectedClass}>
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Classes</SelectItem>
+            {assignedClasses.map(c => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      {/* Verification Result */}
+      {/* Verification result banner */}
       {verificationResult && (
-        <Card className={`mb-6 border-2 shadow-xl ${
-          verificationResult.success 
-            ? 'border-green-500 bg-green-50 dark:bg-green-950/50' 
-            : 'border-red-500 bg-red-50 dark:bg-red-950/50'
-        }`}>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              {verificationResult.success ? (
-                <CheckCircle className="h-12 w-12 text-green-600" />
-              ) : (
-                <XCircle className="h-12 w-12 text-red-600" />
-              )}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold">
-                  {verificationResult.success ? 'Verification Successful' : 'Verification Failed'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {verificationResult.success 
-                    ? `${verificationResult.studentName} verified with ${verificationResult.confidence}% confidence`
-                    : 'Face does not match the selected student'}
-                </p>
-              </div>
-              <Button 
-                variant="outline" 
-                onClick={() => setVerificationResult(null)}
-              >
-                Clear
-              </Button>
+        <Card className={`border-2 ${verificationResult.success ? 'border-green-500 bg-green-50 dark:bg-green-950/50' : 'border-red-500 bg-red-50 dark:bg-red-950/50'}`}>
+          <CardContent className="p-4 flex items-center gap-4">
+            {verificationResult.success ? <CheckCircle className="h-8 w-8 text-green-600" /> : <XCircle className="h-8 w-8 text-red-600" />}
+            <div className="flex-1">
+              <p className="font-semibold">{verificationResult.success ? 'Verified' : 'Failed'}</p>
+              <p className="text-sm text-muted-foreground">
+                {verificationResult.success
+                  ? `${verificationResult.studentName} — ${verificationResult.confidence}% confidence`
+                  : 'Face does not match'}
+              </p>
             </div>
+            <Button variant="outline" size="sm" onClick={() => setVerificationResult(null)}>Dismiss</Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="stat-card from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/20 border-blue-200/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-blue-900 dark:text-blue-100">
-              <User className="h-4 w-4 text-blue-600" />
-              Total Students
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{students?.length || 0}</div>
-          </CardContent>
-        </Card>
-        <Card className="stat-card from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/20 border-green-200/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-green-900 dark:text-green-100">
-              <ShieldCheck className="h-4 w-4 text-green-600" />
-              With Face Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{studentsWithFaces.length}</div>
-          </CardContent>
-        </Card>
-        <Card className="stat-card col-span-2 md:col-span-1 from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/20 border-orange-200/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-orange-900 dark:text-orange-100">Enrollment Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-              {students && students.length > 0
-                ? Math.round((studentsWithFaces.length / students.length) * 100)
-                : 0}%
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Validation Info */}
-      <Card className="mt-6 bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/50">
+      {/* Students table */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-orange-500" />
-            Face Validation Process
-          </CardTitle>
+          <CardTitle>Students</CardTitle>
+          <CardDescription>Mark attendance for today — {new Date().toLocaleDateString()}</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p><strong>Where validation happens:</strong> Face comparison occurs on the server-side for security.</p>
-          <p><strong>Validation steps:</strong></p>
-          <ol className="list-decimal list-inside space-y-1 ml-2">
-            <li>Captured image is validated (format, size, quality)</li>
-            <li>Image is sent securely to the server</li>
-            <li>Server compares with stored face data using recognition algorithm</li>
-            <li>Match confidence score is calculated (threshold: 75%)</li>
-            <li>If verified, attendance record is created automatically</li>
-          </ol>
-          <p className="mt-3 text-xs italic">Note: Current implementation uses a simplified algorithm. For production, integrate AWS Rekognition, Azure Face API, or similar services. See <code className="bg-orange-100 dark:bg-orange-900 px-1 py-0.5 rounded">FACE_RECOGNITION_GUIDE.md</code> for details.</p>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Reg No</TableHead>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Today's Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No students found in your assigned classes.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredStudents.map((student) => {
+                    const today = todayAttendance.get(student.id);
+                    const isPresent = !!today;
+                    return (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-medium">
+                          <div>{student.user?.name || "Unknown"}</div>
+                          <div className="text-xs text-muted-foreground">@{student.user?.username}</div>
+                        </TableCell>
+                        <TableCell>{student.registrationNo}</TableCell>
+                        <TableCell>{student.grade}</TableCell>
+                        <TableCell>
+                          {isPresent ? (
+                            <Badge className="bg-green-500 gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Present{today.faceVerified ? " (Face)" : ""}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Not Marked</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isPresent ? (
+                            <span className="text-sm text-muted-foreground">Done</span>
+                          ) : (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleMarkPresent(student.id)}
+                                disabled={markPending}
+                              >
+                                Mark Present
+                              </Button>
+                              {(student as any).faceImageBase64 && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => { setFaceStudentId(student.id); setShowCapture(true); }}
+                                >
+                                  <Camera className="h-3 w-3 mr-1" />
+                                  Face Verify
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -243,12 +288,10 @@ export default function FaceVerification() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Face Verification</DialogTitle>
-            <DialogDescription>
-              Position your face in the center and ensure good lighting
-            </DialogDescription>
+            <DialogDescription>Position face in the center with good lighting</DialogDescription>
           </DialogHeader>
           <FaceCapture
-            onCapture={handleCapture}
+            onCapture={handleFaceCapture}
             onCancel={() => setShowCapture(false)}
             showPreview={true}
           />

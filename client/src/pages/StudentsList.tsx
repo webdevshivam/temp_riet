@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { GraduationCap, Plus, Search, TrendingUp, TrendingDown, Award, AlertTriangle, CheckCircle, XCircle, Filter, Download } from "lucide-react";
+import { GraduationCap, Plus, Search, TrendingUp, TrendingDown, Award, AlertTriangle, AlertCircle, CheckCircle, XCircle, Filter, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
@@ -132,17 +132,25 @@ export default function StudentsList() {
     username: "",
     password: "password",
     schoolId: "",
+    registrationNo: "",
+    fatherName: "",
+    motherName: "",
+    mobileNumber: "",
+    address: "",
+    permanentAddress: "",
+    gender: "",
+    age: "",
+    parentMobileNumber: "",
     grade: "",
     marks: "0",
     attendanceRate: "100",
-    scholarshipEligible: false,
     faceImageBase64: "",
   });
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.username || !formData.schoolId || !formData.grade) {
+    if (!formData.name || !formData.username || !formData.schoolId || !formData.grade || !formData.registrationNo || !formData.fatherName || !formData.motherName || !formData.address || !formData.permanentAddress || !formData.gender || !formData.age || !formData.parentMobileNumber) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -154,10 +162,18 @@ export default function StudentsList() {
     createStudent.mutate({
       userId: 0, // Will be created
       schoolId: parseInt(formData.schoolId),
+      registrationNo: formData.registrationNo,
+      fatherName: formData.fatherName,
+      motherName: formData.motherName,
+      mobileNumber: formData.mobileNumber || undefined,
+      address: formData.address,
+      permanentAddress: formData.permanentAddress,
+      gender: formData.gender as "male" | "female" | "other",
+      age: parseInt(formData.age),
+      parentMobileNumber: formData.parentMobileNumber,
       grade: formData.grade,
       marks: parseInt(formData.marks),
       attendanceRate: parseInt(formData.attendanceRate),
-      scholarshipEligible: formData.scholarshipEligible,
       user: {
         name: formData.name,
         username: formData.username,
@@ -177,10 +193,18 @@ export default function StudentsList() {
           username: "",
           password: "password",
           schoolId: "",
+          registrationNo: "",
+          fatherName: "",
+          motherName: "",
+          mobileNumber: "",
+          address: "",
+          permanentAddress: "",
+          gender: "",
+          age: "",
+          parentMobileNumber: "",
           grade: "",
           marks: "0",
           attendanceRate: "100",
-          scholarshipEligible: false,
           faceImageBase64: "",
         });
       },
@@ -447,6 +471,16 @@ export default function StudentsList() {
             <form onSubmit={handleCreateStudent} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label htmlFor="registrationNo">Registration No *</Label>
+                  <Input
+                    id="registrationNo"
+                    placeholder="REG-2026-001"
+                    value={formData.registrationNo}
+                    onChange={(e) => setFormData({ ...formData, registrationNo: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input
                     id="name"
@@ -455,7 +489,112 @@ export default function StudentsList() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
-                
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fatherName">Father's Name *</Label>
+                  <Input
+                    id="fatherName"
+                    placeholder="Father's full name"
+                    value={formData.fatherName}
+                    onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="motherName">Mother's Name *</Label>
+                  <Input
+                    id="motherName"
+                    placeholder="Mother's full name"
+                    value={formData.motherName}
+                    onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender *</Label>
+                  <Select value={formData.gender} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
+                    <SelectTrigger id="gender">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="age">Age *</Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    min="1"
+                    max="100"
+                    placeholder="e.g., 16"
+                    value={formData.age}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="grade">Current Class *</Label>
+                  <Input
+                    id="grade"
+                    placeholder="e.g., 10th, Grade 5"
+                    value={formData.grade}
+                    onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="mobileNumber">Mobile Number</Label>
+                  <Input
+                    id="mobileNumber"
+                    placeholder="Student's mobile (optional)"
+                    value={formData.mobileNumber}
+                    onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="parentMobileNumber">Parent Mobile Number *</Label>
+                  <Input
+                    id="parentMobileNumber"
+                    placeholder="Parent's mobile number"
+                    value={formData.parentMobileNumber}
+                    onChange={(e) => setFormData({ ...formData, parentMobileNumber: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Address *</Label>
+                <Input
+                  id="address"
+                  placeholder="Current address"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="permanentAddress">Permanent Address *</Label>
+                <Input
+                  id="permanentAddress"
+                  placeholder="Permanent address"
+                  value={formData.permanentAddress}
+                  onChange={(e) => setFormData({ ...formData, permanentAddress: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="username">Username *</Label>
                   <Input
@@ -465,34 +604,33 @@ export default function StudentsList() {
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="school">School *</Label>
-                  <Select value={formData.schoolId} onValueChange={(v) => setFormData({ ...formData, schoolId: v })}>
-                    <SelectTrigger id="school">
-                      <SelectValue placeholder="Select school" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {schools?.map((school) => (
-                        <SelectItem key={school.id} value={school.id.toString()}>
-                          {school.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="grade">Grade *</Label>
+                  <Label htmlFor="password">Password *</Label>
                   <Input
-                    id="grade"
-                    placeholder="e.g., 10th, Grade 5"
-                    value={formData.grade}
-                    onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                    id="password"
+                    type="password"
+                    placeholder="Enter password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="school">School *</Label>
+                <Select value={formData.schoolId} onValueChange={(v) => setFormData({ ...formData, schoolId: v })}>
+                  <SelectTrigger id="school">
+                    <SelectValue placeholder="Select school" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schools?.map((school) => (
+                      <SelectItem key={school.id} value={school.id.toString()}>
+                        {school.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -529,17 +667,6 @@ export default function StudentsList() {
                     onChange={(e) => setFormData({ ...formData, attendanceRate: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="scholarship"
-                  checked={formData.scholarshipEligible}
-                  onChange={(e) => setFormData({ ...formData, scholarshipEligible: e.target.checked })}
-                  className="rounded border-gray-300"
-                />
-                <Label htmlFor="scholarship" className="cursor-pointer">Scholarship Eligible</Label>
               </div>
 
               <div className="flex justify-end gap-2 pt-4">

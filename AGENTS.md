@@ -57,9 +57,13 @@ The codebase uses a monorepo pattern with three main directories:
 
 **Authentication:**
 - Session-based auth using `express-session` with `memorystore`
-- Login auto-creates users if username doesn't exist (for demo/testing)
-- `requireGov` middleware in `server/routes.ts` guards admin-only endpoints (user management, reports export)
+- Login auto-creates users if username doesn't exist (for demo/testing); role is inferred from username
+- `requireGov` middleware in `server/routes.ts` guards admin-only endpoints (user management, role updates, reports export)
 - Sessions stored in `req.session.userId`; cookie max-age is 7 days
+
+**Reports export:**
+- `GET /api/reports/export` supports `type` (schools/teachers/students/complaints) and `format` (csv/json) query params
+- Guarded by `requireGov` middleware
 
 **Database:**
 - MongoDB via Mongoose
@@ -69,6 +73,8 @@ The codebase uses a monorepo pattern with three main directories:
 
 **Data Models:**
 User, School, Student, Teacher, Attendance, Complaint, Course, BlockchainResult, ScholarshipRule
+
+**Known inconsistency:** The `Teacher` Mongoose schema in `server/db.ts` is missing the `faceImageBase64` field that exists in the TypeScript type (`shared/schema.ts`) and is referenced by the `setTeacherFaceData` route. Mongoose will still store it (schema-less behavior) but it won't have defaults or validation.
 
 ### Client Architecture
 
@@ -89,19 +95,23 @@ User, School, Student, Teacher, Attendance, Complaint, Course, BlockchainResult,
 - Layout components in `client/src/components/layout/`
 - Pages in `client/src/pages/`
 
-**Key pages:**
-- GovDashboard - Analytics overview
-- SchoolsList - School management
-- FaceVerification - Attendance with face recognition
-- BlockchainVerify - Result verification
-- Complaints - Anonymous complaint system
-- Courses - Online course catalog
+**Role-specific dashboards:**
+Each role has its own dashboard component rendered at `/`:
+- `gov_admin` → GovDashboard (analytics overview)
+- `school_admin` → SchoolAdminDashboard
+- `teacher` → TeacherDashboard
+- `student` → StudentDashboard
+
+**Domain hooks pattern:**
+Client-side data fetching is organized into domain-specific hooks in `client/src/hooks/`:
+- `use-schools.ts`, `use-students.ts`, `use-teachers.ts`, `use-attendance.ts`, `use-admin.ts`, `use-analytics.ts`, `use-dashboard.ts`
+- Each hook wraps TanStack Query calls for its domain, providing query keys and mutation helpers.
 
 **Role-based UI:**
 - Session-based auth via `useAuth()` hook (`client/src/hooks/use-auth.ts`)
 - Roles: `gov_admin`, `school_admin`, `teacher`, `student`
 - `ProtectedRoute` component redirects unauthenticated users to `/login`
-- Sidebar and dashboard page adapt based on user role
+- Sidebar navigation links change based on role (defined in `client/src/components/layout/Sidebar.tsx`)
 - Login has mock fallback for demo if backend is unavailable
 
 ### API Contract System
@@ -132,9 +142,9 @@ The `shared/routes.ts` file defines a type-safe API contract:
 ## Important Conventions
 
 ### Path Aliases
-- `@/` → `client/src/`
-- `@shared/` → `shared/`
-- `@assets/` → `attached_assets/`
+- `@/` → `client/src/` (tsconfig + Vite)
+- `@shared/` → `shared/` (tsconfig + Vite)
+- `@assets/` → `attached_assets/` (Vite only — not in tsconfig, so only usable in client code)
 
 ### TypeScript Configuration
 - Strict mode enabled

@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Award,
   ScanFace,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export function Sidebar({ role }: SidebarProps) {
     gov_admin: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/schools", label: "Schools", icon: School },
+      { href: "/admin/attendance", label: "Attendance", icon: ClipboardList },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/admin/users", label: "Users & Roles", icon: Users },
       { href: "/settings/scholarship", label: "Scholarships", icon: Award },
@@ -50,6 +52,7 @@ export function Sidebar({ role }: SidebarProps) {
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/students", label: "Students", icon: GraduationCap },
       { href: "/teachers", label: "Staff", icon: Users },
+      { href: "/admin/attendance", label: "Attendance", icon: ClipboardList },
       { href: "/complaints", label: "Complaints", icon: MessageSquare },
     ],
     teacher: [

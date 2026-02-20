@@ -25,6 +25,7 @@ import AnalyticsOverview from "@/pages/AnalyticsOverview";
 import UsersRoles from "@/pages/UsersRoles";
 import ScholarshipRules from "@/pages/ScholarshipRules";
 import FaceTesting from "@/pages/FaceTesting";
+import AttendanceTracker from "@/pages/AttendanceTracker";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType; path?: string }) {
   const { user, isLoading } = useAuth();
@@ -96,6 +97,7 @@ function Router() {
             <Route path="/admin/users" component={UsersRoles} />
             <Route path="/settings/scholarship" component={ScholarshipRules} />
             <Route path="/attendance" component={FaceVerification} />
+            <Route path="/admin/attendance" component={AttendanceTracker} />
             <Route path="/blockchain" component={BlockchainVerify} />
             <Route path="/courses" component={Courses} />
             <Route path="/complaints" component={Complaints} />

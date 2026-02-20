@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTeachers, useCreateTeacher, useUpdateTeacher, useDeleteTeacher, useSetTeacherFaceData } from "@/hooks/use-teachers";
 import { useSchools } from "@/hooks/use-schools";
+import { useStudents } from "@/hooks/use-students";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,64 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Users, Plus, Search, BookOpen, School as SchoolIcon, Pencil, Trash2, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+function EditTeacherForm({ teacher, subjects, availableGrades, isPending, onSubmit, onCancel }: {
+  teacher: any;
+  subjects: string[];
+  availableGrades: string[];
+  isPending: boolean;
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+}) {
+  const [subject, setSubject] = useState(teacher.subject);
+  const [classes, setClasses] = useState<string[]>(teacher.assignedClasses || []);
+
+  const toggle = (grade: string) => {
+    setClasses(prev => prev.includes(grade) ? prev.filter(c => c !== grade) : [...prev, grade]);
+  };
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ subject, assignedClasses: classes }); }} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Name</Label>
+        <Input value={teacher.user?.name || ''} disabled />
+      </div>
+      <div className="space-y-2">
+        <Label>Subject</Label>
+        <Select value={subject} onValueChange={setSubject}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Assigned Classes</Label>
+        <div className="flex flex-wrap gap-2 border rounded-md p-3">
+          {availableGrades.length === 0 ? (
+            <span className="text-sm text-muted-foreground">No classes available</span>
+          ) : (
+            availableGrades.map(grade => (
+              <label key={grade} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={classes.includes(grade)}
+                  onChange={() => toggle(grade)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">{grade}</span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={isPending}>{isPending ? "Updating..." : "Update"}</Button>
+      </div>
+    </form>
+  );
+}
 
 function fileToBase64(file: File) {
   return new Promise((resolve, reject) => {
@@ -103,6 +162,10 @@ function FaceCaptureDialog({ open, onClose, teachers, defaultTeacherId, onCaptur
 export default function TeachersList() {
   const { data: teachers, isLoading } = useTeachers();
   const { data: schools } = useSchools();
+  const { data: students } = useStudents();
+
+  // Get unique grades from students for class assignment
+  const availableGrades = Array.from(new Set(students?.map(s => s.grade) || [])).sort();
   const createTeacher = useCreateTeacher();
   const updateTeacher = useUpdateTeacher();
   const deleteTeacher = useDeleteTeacher();
@@ -122,7 +185,7 @@ export default function TeachersList() {
     password: "password",
     schoolId: "",
     subject: "",
-    classesAssigned: "0",
+    assignedClasses: [] as string[],
   });
 
   const handleCreateTeacher = async (e: React.FormEvent) => {
@@ -141,7 +204,7 @@ export default function TeachersList() {
       userId: 0, // Will be created
       schoolId: parseInt(formData.schoolId),
       subject: formData.subject,
-      classesAssigned: parseInt(formData.classesAssigned),
+      assignedClasses: formData.assignedClasses,
       user: {
         name: formData.name,
         username: formData.username,
@@ -161,7 +224,7 @@ export default function TeachersList() {
           password: "password",
           schoolId: "",
           subject: "",
-          classesAssigned: "0",
+          assignedClasses: [],
         });
       },
       onError: (error: Error) => {
@@ -179,11 +242,13 @@ export default function TeachersList() {
     teacher.subject.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const getWorkloadBadge = (classes: number) => {
-    if (classes >= 6) return <Badge variant="destructive">Heavy</Badge>;
-    if (classes >= 4) return <Badge className="bg-yellow-500">Moderate</Badge>;
-    if (classes >= 2) return <Badge className="bg-blue-500">Light</Badge>;
-    return <Badge variant="secondary">Very Light</Badge>;
+  const toggleClass = (grade: string) => {
+    setFormData(prev => ({
+      ...prev,
+      assignedClasses: prev.assignedClasses.includes(grade)
+        ? prev.assignedClasses.filter(c => c !== grade)
+        : [...prev.assignedClasses, grade],
+    }));
   };
 
   // Subject list
@@ -273,15 +338,24 @@ export default function TeachersList() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="classes">Classes Assigned</Label>
-                <Input
-                  id="classes"
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={formData.classesAssigned}
-                  onChange={(e) => setFormData({ ...formData, classesAssigned: e.target.value })}
-                />
+                <Label>Assign Classes</Label>
+                <div className="flex flex-wrap gap-2 border rounded-md p-3">
+                  {availableGrades.length === 0 ? (
+                    <span className="text-sm text-muted-foreground">No classes available (add students first)</span>
+                  ) : (
+                    availableGrades.map(grade => (
+                      <label key={grade} className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.assignedClasses.includes(grade)}
+                          onChange={() => toggleClass(grade)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm">{grade}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
@@ -316,7 +390,7 @@ export default function TeachersList() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {teachers?.reduce((acc, t) => acc + t.classesAssigned, 0) || 0}
+              {teachers?.reduce((acc, t) => acc + t.assignedClasses.length, 0) || 0}
             </div>
           </CardContent>
         </Card>
@@ -329,7 +403,7 @@ export default function TeachersList() {
           <CardContent>
             <div className="text-2xl font-bold">
               {teachers && teachers.length > 0
-                ? (teachers.reduce((acc, t) => acc + t.classesAssigned, 0) / teachers.length).toFixed(1)
+                ? (teachers.reduce((acc, t) => acc + t.assignedClasses.length, 0) / teachers.length).toFixed(1)
                 : 0}
             </div>
           </CardContent>
@@ -377,8 +451,7 @@ export default function TeachersList() {
                   <TableHead>Name</TableHead>
                   <TableHead>School</TableHead>
                   <TableHead>Subject</TableHead>
-                  <TableHead>Classes</TableHead>
-                  <TableHead>Workload</TableHead>
+                  <TableHead>Assigned Classes</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -404,11 +477,16 @@ export default function TeachersList() {
                       <TableCell>
                         <Badge variant="outline">{teacher.subject}</Badge>
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {teacher.classesAssigned}
-                      </TableCell>
                       <TableCell>
-                        {getWorkloadBadge(teacher.classesAssigned)}
+                        <div className="flex flex-wrap gap-1">
+                          {teacher.assignedClasses.length > 0 ? (
+                            teacher.assignedClasses.map(c => (
+                              <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">None</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -439,55 +517,25 @@ export default function TeachersList() {
             <DialogTitle>Edit Teacher</DialogTitle>
             <DialogDescription>Update teacher information</DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            if (!selectedTeacher) return;
-            const formData = new FormData(e.currentTarget);
-            updateTeacher.mutate({
-              id: selectedTeacher.id,
-              data: {
-                subject: formData.get('subject') as string,
-                classesAssigned: parseInt(formData.get('classesAssigned') as string),
-              } as any
-            }, {
-              onSuccess: () => {
-                toast({ title: "Success", description: "Teacher updated successfully" });
-                setIsEditDialogOpen(false);
-                setSelectedTeacher(null);
-              },
-              onError: (error: Error) => {
-                toast({ title: "Error", description: error.message, variant: "destructive" });
-              },
-            });
-          }} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input value={selectedTeacher?.user?.name || ''} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-subject">Subject</Label>
-              <Select name="subject" defaultValue={selectedTeacher?.subject}>
-                <SelectTrigger id="edit-subject">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["Mathematics", "Science", "English", "History", "Geography", "Physics", "Chemistry", "Biology", "Computer Science", "Physical Education"].map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-classes">Classes Assigned</Label>
-              <Input id="edit-classes" name="classesAssigned" type="number" min="0" max="10" defaultValue={selectedTeacher?.classesAssigned || 0} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedTeacher(null); }}>Cancel</Button>
-              <Button type="submit" disabled={updateTeacher.isPending}>
-                {updateTeacher.isPending ? "Updating..." : "Update"}
-              </Button>
-            </div>
-          </form>
+          {selectedTeacher && <EditTeacherForm
+            teacher={selectedTeacher}
+            subjects={subjects}
+            availableGrades={availableGrades}
+            isPending={updateTeacher.isPending}
+            onSubmit={(data) => {
+              updateTeacher.mutate({ id: selectedTeacher.id, data }, {
+                onSuccess: () => {
+                  toast({ title: "Success", description: "Teacher updated successfully" });
+                  setIsEditDialogOpen(false);
+                  setSelectedTeacher(null);
+                },
+                onError: (error: Error) => {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                },
+              });
+            }}
+            onCancel={() => { setIsEditDialogOpen(false); setSelectedTeacher(null); }}
+          />}
         </DialogContent>
       </Dialog>
 

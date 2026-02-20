@@ -189,6 +189,7 @@ export class DatabaseStorage implements IStorage {
     const created = await StudentModel.create({
       id,
       ...insertStudent,
+      mobileNumber: insertStudent.mobileNumber ?? null,
       attendanceRate: insertStudent.attendanceRate ?? 100,
       marks: insertStudent.marks ?? 0,
       scholarshipEligible: insertStudent.scholarshipEligible ?? false,
@@ -231,7 +232,7 @@ export class DatabaseStorage implements IStorage {
     const created = await TeacherModel.create({
       id,
       ...insertTeacher,
-      classesAssigned: insertTeacher.classesAssigned ?? 0,
+      assignedClasses: insertTeacher.assignedClasses ?? [],
       faceImageBase64: (insertTeacher as any).faceImageBase64 ?? null,
     });
     const teacher = cleanDoc<Teacher>(created.toObject()) as Teacher;
@@ -263,6 +264,15 @@ export class DatabaseStorage implements IStorage {
     await UserModel.deleteOne({ id: (teacher as any).userId });
     const res = await TeacherModel.deleteOne({ id });
     return res.deletedCount === 1;
+  }
+
+  async getTeacherByUserId(userId: number): Promise<(Teacher & { user?: User }) | undefined> {
+    await connectToDatabase();
+    const doc = await TeacherModel.findOne({ userId }).lean();
+    const teacher = cleanDoc<Teacher>(doc);
+    if (!teacher) return undefined;
+    const user = cleanDoc<User>(await UserModel.findOne({ id: teacher.userId }).lean());
+    return { ...teacher, user };
   }
 
   async setTeacherFaceData(id: number, imageBase64: string): Promise<void> {
@@ -299,6 +309,7 @@ export class DatabaseStorage implements IStorage {
       id,
       ...insertAttendance,
       faceVerified: insertAttendance.faceVerified ?? false,
+      markedByTeacherId: insertAttendance.markedByTeacherId ?? null,
       date: new Date(),
     });
     return cleanDoc<Attendance>(created.toObject()) as Attendance;

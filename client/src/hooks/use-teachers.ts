@@ -1,6 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type InsertTeacher, buildUrl } from "@shared/routes";
 
+export function useTeacherMe() {
+  return useQuery({
+    queryKey: [api.teachers.me.path],
+    queryFn: async () => {
+      const res = await fetch(api.teachers.me.path);
+      if (!res.ok) return null;
+      return api.teachers.me.responses[200].parse(await res.json());
+    },
+    retry: false,
+  });
+}
+
 export function useTeachers(schoolId?: number) {
   return useQuery({
     queryKey: [api.teachers.list.path, schoolId],

@@ -25,10 +25,21 @@ export type School = {
   shortageDetails?: { subject: string; count: number }[] | null;
 };
 
+const genderSchema = z.enum(["male", "female", "other"]);
+
 export type Student = {
   id: number;
   userId: number;
   schoolId: number;
+  registrationNo: string;
+  fatherName: string;
+  motherName: string;
+  mobileNumber?: string | null;
+  address: string;
+  permanentAddress: string;
+  gender: z.infer<typeof genderSchema>;
+  age: number;
+  parentMobileNumber: string;
   grade: string;
   attendanceRate: number;
   marks: number;
@@ -42,7 +53,7 @@ export type Teacher = {
   userId: number;
   schoolId: number;
   subject: string;
-  classesAssigned: number;
+  assignedClasses: string[];
   faceImageBase64?: string | null;
 };
 
@@ -52,6 +63,7 @@ export type Attendance = {
   date: Date;
   status: z.infer<typeof attendanceStatusSchema>;
   faceVerified: boolean;
+  markedByTeacherId?: number | null;
 };
 
 export type Complaint = {
@@ -138,6 +150,15 @@ export const insertSchoolSchema = z.object({
 export const insertStudentSchema = z.object({
   userId: z.number(),
   schoolId: z.number(),
+  registrationNo: z.string(),
+  fatherName: z.string(),
+  motherName: z.string(),
+  mobileNumber: z.string().optional(),
+  address: z.string(),
+  permanentAddress: z.string(),
+  gender: genderSchema,
+  age: z.number().min(1).max(100),
+  parentMobileNumber: z.string(),
   grade: z.string(),
   attendanceRate: z.number().optional(),
   marks: z.number().optional(),
@@ -150,7 +171,7 @@ export const insertTeacherSchema = z.object({
   userId: z.number(),
   schoolId: z.number(),
   subject: z.string(),
-  classesAssigned: z.number().optional(),
+  assignedClasses: z.array(z.string()).optional(),
   faceImageBase64: z.string().optional(),
 });
 
@@ -158,6 +179,7 @@ export const insertAttendanceSchema = z.object({
   studentId: z.number(),
   status: attendanceStatusSchema,
   faceVerified: z.boolean().optional(),
+  markedByTeacherId: z.number().optional(),
 });
 
 export const insertComplaintSchema = z.object({

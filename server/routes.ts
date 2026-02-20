@@ -119,6 +119,15 @@ export async function registerRoutes(
     }
   });
 
+  // Teacher: get own profile
+  app.get(api.teachers.me.path, async (req, res) => {
+    const userId = (req as any).session?.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const teacher = await storage.getTeacherByUserId(userId);
+    if (!teacher) return res.status(404).json({ message: 'Teacher record not found' });
+    res.json(teacher);
+  });
+
   app.get(api.teachers.list.path, async (req, res) => {
     const schoolId = req.query.schoolId ? Number(req.query.schoolId) : undefined;
     const teachers = await storage.getTeachers(schoolId);
@@ -412,7 +421,7 @@ export async function registerRoutes(
     }
     let rows: any[] = [];
     if (type === 'schools') rows = await storage.getSchoolsWithComplaintCounts(district);
-    if (type === 'teachers') rows = await TeacherModel.find().select({ _id:0, id:1, userId:1, schoolId:1, subject:1, classesAssigned:1 }).lean();
+    if (type === 'teachers') rows = await TeacherModel.find().select({ _id:0, id:1, userId:1, schoolId:1, subject:1, assignedClasses:1 }).lean();
     if (type === 'students') rows = await StudentModel.find().select({ _id:0, id:1, userId:1, schoolId:1, grade:1, marks:1, attendanceRate:1, scholarshipEligible:1 }).lean();
     if (type === 'complaints') rows = await ComplaintModel.find().select({ _id:0, id:1, schoolId:1, title:1, status:1, createdAt:1, aiClassification:1 }).lean();
     if (format === 'json') {
@@ -461,7 +470,7 @@ async function seedDatabase() {
       userId: userTeacher.id,
       schoolId: school.id,
       subject: "Math",
-      classesAssigned: 4,
+      assignedClasses: ["4th"],
     });
 
     const userStudent = await storage.createUser({
@@ -475,6 +484,14 @@ async function seedDatabase() {
     const student = await storage.createStudent({
       userId: userStudent.id,
       schoolId: school.id,
+      registrationNo: "REG-2023-001",
+      fatherName: "Homer Simpson",
+      motherName: "Marge Simpson",
+      address: "742 Evergreen Terrace, Springfield",
+      permanentAddress: "742 Evergreen Terrace, Springfield",
+      gender: "male",
+      age: 10,
+      parentMobileNumber: "5551234567",
       grade: "4th",
       attendanceRate: 85,
       marks: 70,

@@ -163,6 +163,15 @@ export const api = {
     },
   },
   teachers: {
+    me: {
+      method: 'GET' as const,
+      path: '/api/teachers/me' as const,
+      responses: {
+        200: teacherWithDetailsSchema,
+        401: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
     list: {
       method: 'GET' as const,
       path: '/api/teachers' as const,
