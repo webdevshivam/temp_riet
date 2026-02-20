@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Poppins', sans-serif;
+
+  /* Warm, Humanistic Palette - Sunset & Earth Tones */
+  --background: 30 40% 98%;  /* Warm cream */
+  --foreground: 20 25% 15%;  /* Deep warm brown */
+
+  --card: 30 50% 99%;  /* Soft warm white */
+  --card-foreground: 20 25% 15%;
+
+  --popover: 30 50% 99%;
+  --popover-foreground: 20 25% 15%;
+
+  --primary: 25 95% 58%;  /* Warm coral/orange */
+  --primary-foreground: 30 50% 99%;
+
+  --secondary: 35 60% 92%;  /* Soft peach */
+  --secondary-foreground: 20 25% 15%;
+
+  --muted: 35 40% 94%;  /* Light warm gray */
+  --muted-foreground: 25 15% 45%;
+
+  --accent: 340 75% 55%;  /* Warm pink/rose */
+  --accent-foreground: 30 50% 99%;
+
+  --success: 140 60% 45%;  /* Warm green */
+  --success-foreground: 30 50% 99%;
+
+  --warning: 45 95% 55%;  /* Golden yellow */
+  --warning-foreground: 20 25% 15%;
+
+  --destructive: 5 75% 55%;  /* Warm red */
+  --destructive-foreground: 30 50% 99%;
+
+  --border: 30 30% 88%;  /* Soft warm border */
+  --input: 30 30% 92%;
+  --ring: 25 95% 58%;
+
+  --radius: 1rem;  /* Softer, more rounded */
+}
+
+.dark {
+  --background: 20 30% 8%;  /* Deep warm dark */
+  --foreground: 30 40% 95%;
+
+  --card: 20 25% 12%;  /* Dark warm card */
+  --card-foreground: 30 40% 95%;
+
+  --popover: 20 25% 12%;
+  --popover-foreground: 30 40% 95%;
+
+  --primary: 25 90% 55%;  /* Slightly dimmed warm coral */
+  --primary-foreground: 30 50% 99%;
+
+  --secondary: 20 20% 18%;  /* Warm dark gray */
+  --secondary-foreground: 30 40% 95%;
+
+  --muted: 20 20% 18%;
+  --muted-foreground: 30 20% 60%;
+
+  --accent: 340 70% 50%;  /* Dimmed warm pink */
+  --accent-foreground: 30 50% 99%;
+
+  --success: 140 55% 40%;
+  --success-foreground: 30 50% 99%;
+
+  --warning: 45 90% 50%;
+  --warning-foreground: 20 25% 15%;
+
+  --destructive: 5 70% 50%;
+  --destructive-foreground: 30 50% 99%;
+
+  --border: 20 20% 22%;
+  --input: 20 20% 18%;
+  --ring: 25 90% 55%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 dark:bg-black/40 backdrop-blur-xl border border-orange-100/30 dark:border-orange-900/20 shadow-2xl;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-500 ease-out hover:shadow-2xl hover:shadow-orange-200/30 hover:-translate-y-2 hover:scale-[1.02];
+  }
+
+  .warm-text {
+    @apply text-orange-600 dark:text-orange-400;
+  }
+
+  .warm-bg {
+    @apply bg-orange-50 dark:bg-orange-950/30;
+  }
+
+  .warm-shadow {
+    @apply shadow-lg shadow-orange-200/40 dark:shadow-orange-900/20;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all duration-300 font-medium;
+  }
+  
+  .sidebar-link.active {
+    @apply bg-orange-100 dark:bg-orange-900/40 text-primary hover:bg-orange-100 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-300/40 hover:shadow-xl hover:shadow-orange-400/50 transition-all duration-300;
+  }
+
+  .stat-card {
+    @apply p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 hover:scale-105;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
+}
